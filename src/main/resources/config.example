@@ -1,0 +1,4 @@
+// rename to config.properties
+rs.host=
+rs.port=
+rs.auth=
