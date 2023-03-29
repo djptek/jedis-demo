@@ -2,3 +2,7 @@
 rs.host=
 rs.port=
 rs.auth=
+// max number of threads
+ts.max=
+// min idle time for pool
+pc.minidle=
