@@ -38,10 +38,16 @@ public class App
 
         try (Jedis jedis = pool.getResource()) {
             jedis.auth(prop.getProperty("rs.auth"));
-            String k = "hello";
-            String v = "world";
-            System.out.printf("> SET %s %s\n%s\n", k, v, jedis.set(k, v));
-            System.out.printf("> GET %s\n%s\n", k, jedis.get(k));
+            String response = jedis.ping();
+            System.out.printf("> PING\n%s\n", response);
+            if (response.equals("PONG")) {
+                String k = "hello";
+                String v = "world";
+                System.out.printf("> SET %s %s\n%s\n", k, v, jedis.set(k, v));
+                System.out.printf("> GET %s\n%s\n", k, jedis.get(k));
+            } else {
+                System.out.printf("PING returned [%s] skipping\n", response);    
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
