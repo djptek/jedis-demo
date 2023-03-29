@@ -36,7 +36,10 @@ public class App
             prop.getProperty("rs.host"),
             Integer.parseInt(prop.getProperty("rs.port")));
 
+        resourceInfo(prop, pool);
+
         try (Jedis jedis = pool.getResource()) {
+            resourceInfo(prop, pool);
             jedis.auth(prop.getProperty("rs.auth"));
             String response = jedis.ping();
             System.out.printf("> PING\n%s\n", response);
@@ -52,6 +55,16 @@ public class App
             e.printStackTrace();
         }
       
+        resourceInfo(prop, pool);
+
         pool.close();
+    }
+
+    private static void resourceInfo(Properties prop, JedisPool pool) {
+        System.out.printf(
+            "Endpoint %s:%s\nhas %d active resources\n", 
+            prop.getProperty("rs.host"), 
+            prop.getProperty("rs.port"),
+            pool.getNumActive());
     }
 }
