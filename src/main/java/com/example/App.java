@@ -32,9 +32,10 @@ public class App
 
     private static void managePool(Properties prop) {
         GenericObjectPoolConfig<Jedis> poolConfig = new GenericObjectPoolConfig<>();
-        poolConfig.setMaxTotal(Integer.parseInt(prop.getProperty("ts.max")));
-        poolConfig.setMaxIdle(Integer.parseInt(prop.getProperty("ts.max")) * 2);
-        poolConfig.setMinIdle(Integer.parseInt(prop.getProperty("pc.minidle")));
+        // underdimension to force some queuing behaviour
+        poolConfig.setMaxTotal(Integer.parseInt(prop.getProperty("pc.maxtotal")));
+        //poolConfig.setMaxIdle(Integer.parseInt(prop.getProperty("ts.max")) / 2);
+        //poolConfig.setMinIdle(Integer.parseInt(prop.getProperty("pc.minidle")));
         
         JedisPool pool = new JedisPool(
             poolConfig, 
@@ -44,26 +45,18 @@ public class App
 
         ArrayList<Jedis> resources = new ArrayList<Jedis>();
         for (int i = 0; i < Integer.parseInt(prop.getProperty("ts.max")); i++ ) {
-            resources.add(pool.getResource());
+            // don't trust in try to close as threads getting crossed up 
+            Thread hwThread = new Thread(() -> { 
+                helloWorld(pool.getResource(), auth);
+            });
+            hwThread.start();
+            //resourceInfo(prop, pool);
         }
-
-        resourceInfo(prop, pool);
-        for (Jedis jedis : resources) {
-            try (Jedis j = jedis) {
-                Thread hwThread = new Thread(() -> { 
-                    helloWorld(j, auth);
-                });
-                hwThread.start(); 
-            } catch (Exception e) {
-                e.printStackTrace();
-            } 
-        }
-        resourceInfo(prop, pool);
         
         Jedis jedis = pool.getResource();
         
         jedis.auth(auth);
-        if (pingWait(jedis, auth)) {
+        if (pingWait(jedis)) {
             int count = safeGetInt(jedis, "count");
             while (count < Integer.parseInt(prop.getProperty("ts.max"))) { 
                 System.out.printf("parent> GET %s => %s\n", "count", count);
@@ -88,7 +81,7 @@ public class App
         String t = Thread.currentThread().getName();
        
         jedis.auth(auth);
-        if (pingWait(jedis, auth)) {
+        if (pingWait(jedis)) {
             //String k = "hello";
             String k = t;
             String v = "world";
@@ -99,9 +92,10 @@ public class App
             // nope, the lock can transition through 0 without completing all threads
             System.out.printf("%s> INCR count => %s\n", t, jedis.incr("count"));
         }
+        jedis.close();
     }
 
-    private static boolean pingWait(Jedis jedis, String auth) {
+    private static boolean pingWait(Jedis jedis) {
         String response = jedis.ping();
         int retries = 10;
         int i = 1;

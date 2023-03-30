@@ -4,5 +4,5 @@ rs.port=
 rs.auth=
 // max number of threads
 ts.max=
-// min idle time for pool
-pc.minidle=
+// max resources in pool
+pc.maxtotal=
