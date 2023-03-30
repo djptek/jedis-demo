@@ -33,6 +33,7 @@ public class App
     private static void managePool(Properties prop) {
         GenericObjectPoolConfig<Jedis> poolConfig = new GenericObjectPoolConfig<>();
         poolConfig.setMaxTotal(Integer.parseInt(prop.getProperty("ts.max")));
+        poolConfig.setMaxIdle(Integer.parseInt(prop.getProperty("ts.max")) * 2);
         poolConfig.setMinIdle(Integer.parseInt(prop.getProperty("pc.minidle")));
         
         JedisPool pool = new JedisPool(
@@ -41,48 +42,94 @@ public class App
             Integer.parseInt(prop.getProperty("rs.port")));
         String auth = prop.getProperty("rs.auth");
 
-        ArrayList<Jedis> jedis = new ArrayList<Jedis>();
+        ArrayList<Jedis> resources = new ArrayList<Jedis>();
         for (int i = 0; i < Integer.parseInt(prop.getProperty("ts.max")); i++ ) {
-            jedis.add(pool.getResource());
+            resources.add(pool.getResource());
         }
 
-        for (Jedis j : jedis) {
-            resourceInfo(prop, pool);
-            
-            try (Jedis myJedis = j) {
+        resourceInfo(prop, pool);
+        for (Jedis jedis : resources) {
+            try (Jedis j = jedis) {
                 Thread hwThread = new Thread(() -> { 
-                    helloWorld(myJedis, auth);
+                    helloWorld(j, auth);
                 });
                 hwThread.start(); 
             } catch (Exception e) {
                 e.printStackTrace();
             } 
         }
+        resourceInfo(prop, pool);
+        
+        Jedis jedis = pool.getResource();
+        
+        jedis.auth(auth);
+        if (pingWait(jedis, auth)) {
+            int count = safeGetInt(jedis, "count");
+            while (count < Integer.parseInt(prop.getProperty("ts.max"))) { 
+                System.out.printf("parent> GET %s => %s\n", "count", count);
+                resourceInfo(prop, pool);
+                waitms(100);
+                count = safeGetInt(jedis, "count");
+            }
+        }
+
+        System.out.printf("parent> DEL count => %s\n", jedis.del("count"));
 
         pool.close();
     }
 
+    private static int safeGetInt(Jedis jedis, String key) {
+        String v = jedis.get(key);
+        System.out.printf("safeGetInt(%s) => %s\n", key, v);
+        return v != null ? Integer.parseInt(v) : 0;
+    }
+
     private static void helloWorld(Jedis jedis, String auth) {
+        String t = Thread.currentThread().getName();
+       
         jedis.auth(auth);
-        String response = jedis.ping();
-        System.out.printf("> PING\n%s\n", response);
-        if (response.equals("PONG")) {
+        if (pingWait(jedis, auth)) {
             //String k = "hello";
+            String k = t;
             String v = "world";
-            String k = Thread.currentThread().getName();
-            System.out.printf("> SET %s %s\n%s\n", k, v, jedis.set(k, v));
-            System.out.printf("> GET %s\n%s\n", k, jedis.get(k));
-        } else {
-            System.out.printf("PING returned [%s] skipping\n", response);    
+            //System.out.printf("%s> INCR lock => %s\n", t, jedis.incr("lock"));
+            System.out.printf("%s> SET %s %s => %s\n", t, k, v, jedis.set(k, v));
+            System.out.printf("%s> GET %s => %s\n", t, k, jedis.get(k));
+            //System.out.printf("%s> INCRBY lock -1 => %s\n", t, jedis.incrBy("lock", -1));
+            // nope, the lock can transition through 0 without completing all threads
+            System.out.printf("%s> INCR count => %s\n", t, jedis.incr("count"));
+        }
+    }
+
+    private static boolean pingWait(Jedis jedis, String auth) {
+        String response = jedis.ping();
+        int retries = 10;
+        int i = 1;
+        while (!response.equals("PONG") && i <= retries) {
+            waitms(100);
+            response = jedis.ping();
+            i++;
+        }
+        if (i > 1) {
+            System.out.printf(
+                "pingWait got [%s] after %d attempts\n",
+                response,
+                i);
+        }
+        return response.equals("PONG");
+    }
+
+    private static void waitms(int ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
     }
 
     private static void resourceInfo(Properties prop, JedisPool pool) {
         System.out.printf(
-            //"Endpoint %s:%s has:\n%d active resources\n%d idle resources\n", 
             "%d active resources\t%d idle resources\n", 
-            //prop.getProperty("rs.host"), 
-            //prop.getProperty("rs.port"),
             pool.getNumActive(),
             pool.getNumIdle());
     }
