@@ -1,8 +1,0 @@
-// rename to config.properties
-rs.host=
-rs.port=
-rs.auth=
-// max number of threads
-ts.max=
-// max resources in pool
-pc.maxtotal=
