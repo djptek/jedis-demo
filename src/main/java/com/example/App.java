@@ -58,7 +58,7 @@ public class App
                 hwThread.start();
                 i++;
             } catch (redis.clients.jedis.exceptions.JedisConnectionException e) {
-                System.out.printf("Failed to connect to any host resolved for DNS name :(");
+                System.out.printf("Failed to connect to any host resolved for DNS name :(\n");
                 f++;
             }
         }
@@ -100,7 +100,7 @@ public class App
             System.out.printf("%s> HGET %s %s => %s\n", t, k, t, jedis.hget(k, t));
             //System.out.printf("%s> INCRBY lock -1 => %s\n", t, jedis.incrBy("lock", -1));
             // nope, the lock can transition through 0 without completing all threads
-            System.out.printf("%s> INCR count => %s\n", t, jedis.hincrBy(k, c, 1));
+            System.out.printf("%s> HINCRBY %s %s %d => %s\n", t, k, c, 1, jedis.hincrBy(k, c, 1));
         }
         jedis.close();
     }
