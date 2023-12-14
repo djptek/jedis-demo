@@ -52,4 +52,4 @@ Example output:
     safeGetHInt(jedis, count) => 1000
     parent> DEL jedis => 1
     Threads launched => 1000
-    Fail/Retry total => 17
+    Fail/Retry total => 17# redis-jedis-scratch
